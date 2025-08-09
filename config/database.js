@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const logger = require('./logger');
+require('dotenv').config();
 
 class Database {
   constructor() {

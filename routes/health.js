@@ -17,11 +17,11 @@ router.get('/', async (req, res) => {
     const [licenseCount, sessionCount] = await Promise.all([
       Promise.race([
         License.countDocuments(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
       ]),
       Promise.race([
         Session.countDocuments(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
       ])
     ]);
     
