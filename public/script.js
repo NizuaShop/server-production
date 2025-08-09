@@ -62,15 +62,15 @@ function updateStatusUI(status, statusText, data, startTime, responseTime = null
     
     if (status === 'online' && data) {
         // Serveur en ligne - afficher les données
-        serverStatus.textContent = '✅ En ligne';
+        serverStatus.textContent = 'En ligne';
         serverStatus.style.color = '#28a745';
         
         // Base de données
         if (data.database && data.database.connected) {
-            dbStatus.textContent = '✅ Connectée';
+            dbStatus.textContent = 'Connectée';
             dbStatus.style.color = '#28a745';
         } else {
-            dbStatus.textContent = '❌ Déconnectée';
+            dbStatus.textContent = 'Déconnectée';
             dbStatus.style.color = '#dc3545';
         }
         
@@ -90,10 +90,10 @@ function updateStatusUI(status, statusText, data, startTime, responseTime = null
         
     } else if (status === 'offline') {
         // Serveur hors ligne
-        serverStatus.textContent = '❌ Hors ligne';
+        serverStatus.textContent = 'Hors ligne';
         serverStatus.style.color = '#dc3545';
         
-        dbStatus.textContent = '❓ Inconnu';
+        dbStatus.textContent = 'Inconnu';
         dbStatus.style.color = '#6c757d';
         
         serverVersion.textContent = 'Inconnu';
@@ -106,7 +106,7 @@ function updateStatusUI(status, statusText, data, startTime, responseTime = null
         
     } else if (status === 'checking') {
         // En cours de vérification
-        serverStatus.textContent = '🔄 Vérification...';
+        serverStatus.textContent = 'Vérification...';
         serverStatus.style.color = '#ffc107';
         
         responseTimeElement.textContent = '-';
