@@ -116,30 +116,29 @@ function updateStatusUI(status, statusText, data, startTime, responseTime = null
 
 // Fonction pour basculer l'actualisation automatique
 function toggleAutoRefresh() {
-    const button = document.querySelector('button[onclick="toggleAutoRefresh()"]');
+    const button = document.getElementById('autoRefreshBtn');
     const buttonText = document.getElementById('autoRefreshText');
     
     if (isAutoRefreshActive) {
-        // Arrêter l'actualisation automatique
         clearInterval(autoRefreshInterval);
         autoRefreshInterval = null;
         isAutoRefreshActive = false;
         
-        buttonText.textContent = 'Activer l\'actualisation auto';
+        buttonText.textContent = '▶️ Activer l\'actualisation auto';
         button.classList.remove('active');
         
         console.log('Actualisation automatique désactivée');
     } else {
-        // Démarrer l'actualisation automatique (toutes les 30 secondes)
         autoRefreshInterval = setInterval(checkStatus, 30000);
         isAutoRefreshActive = true;
         
-        buttonText.textContent = 'Désactiver l\'actualisation auto';
+        buttonText.textContent = '⏸️ Désactiver l\'actualisation auto';
         button.classList.add('active');
         
         console.log('Actualisation automatique activée (30s)');
     }
 }
+
 
 // Fonction pour formater la date
 function formatDate(date) {
