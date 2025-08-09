@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nizua License Server - Statut</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <h1>🔐 Nizua License Server</h1>
+                <p class="subtitle">Serveur de validation de licences</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="status-card">
+                <div class="status-indicator" id="statusIndicator">
+                    <div class="pulse"></div>
+                    <span class="status-text" id="statusText">Vérification...</span>
+                </div>
+                
+                <div class="status-details" id="statusDetails">
+                    <div class="detail-item">
+                        <span class="label">Statut:</span>
+                        <span class="value" id="serverStatus">En cours de vérification...</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Dernière vérification:</span>
+                        <span class="value" id="lastCheck">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Temps de réponse:</span>
+                        <span class="value" id="responseTime">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="label">Base de données:</span>
+                        <span class="value" id="dbStatus">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-card">
+                    <h3>🌐 Endpoints Disponibles</h3>
+                    <ul class="endpoint-list">
+                        <li><code>POST /api/validate-key</code> - Validation de clé</li>
+                        <li><code>POST /api/check-session</code> - Vérification de session</li>
+                        <li><code>GET /api/updates/check</code> - Vérification des mises à jour</li>
+                        <li><code>GET /health</code> - Santé du serveur</li>
+                        <li><code>GET /api/admin/*</code> - Administration (authentifié)</li>
+                    </ul>
+                </div>
+
+                <div class="info-card">
+                    <h3>📊 Informations Système</h3>
+                    <div class="system-info" id="systemInfo">
+                        <div class="info-item">
+                            <span class="label">Plateforme:</span>
+                            <span class="value">Vercel Serverless</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Version:</span>
+                            <span class="value" id="serverVersion">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Environnement:</span>
+                            <span class="value" id="environment">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Uptime:</span>
+                            <span class="value" id="uptime">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" onclick="checkStatus()">
+                    🔄 Actualiser le statut
+                </button>
+                <button class="btn btn-secondary" onclick="toggleAutoRefresh()">
+                    <span id="autoRefreshText">▶️ Activer l'actualisation auto</span>
+                </button>
+            </div>
+
+            <div class="footer-info">
+                <p>Cette page affiche le statut en temps réel du serveur Nizua License.</p>
+                <p>Le serveur est hébergé sur <strong>Vercel</strong> et utilise MongoDB pour le stockage des données.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>

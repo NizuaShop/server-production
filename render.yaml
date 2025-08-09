@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: nizua-license-server
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService: true
+      - key: TRUST_PROXY
+        value: "true"
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: ALLOWED_IPS
+        value: "*"
+    healthCheckPath: /health
