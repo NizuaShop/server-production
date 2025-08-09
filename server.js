@@ -21,6 +21,7 @@ const adminRoutes = require('./routes/admin');
 const healthRoutes = require('./routes/health');
 const updateRoutes = require('./routes/updates');
 const versionRoutes = require('./routes/version');
+const logsRoutes = require('./routes/logs');
 
 // Import des modèles pour s'assurer qu'ils sont chargés
 require('./models/License');
@@ -28,6 +29,7 @@ require('./models/Session');
 require('./models/AuditLog');
 require('./models/UpdateToken');
 require('./models/AppVersion');
+require('./models/LogEntry');
 const GitHubVersionService = require('./services/GitHubVersionService');
 
 // Instance globale du service de versioning
@@ -129,6 +131,9 @@ app.use('/health', healthRoutes);
 // Routes d'authentification
 app.use('/api', authRoutes);
 
+// Routes des logs d'application
+app.use('/api/logs', logsRoutes);
+
 // Routes des mises à jour
 app.use('/api/updates', updateRoutes);
 
@@ -161,7 +166,10 @@ app.use('/api/*', (req, res) => {
       'GET /health',
       'POST /api/validate-key',
       'POST /api/check-session',
-      'GET /api/updates/check'
+      'GET /api/updates/check',
+      'POST /api/logs',
+      'GET /api/logs/health',
+      'GET /api/logs/stats/:hwid'
     ]
   });
 });
@@ -188,21 +196,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-// Middleware d'initialisation pour Vercel
-app.use(async (req, res, next) => {
-  try {
-    await initializeServer();
-    next();
-  } catch (error) {
-    logger.error('Erreur d\'initialisation:', error);
-    res.status(503).json({
-      success: false,
-      error: 'Service temporairement indisponible',
-      message: 'Le serveur s\'initialise, veuillez réessayer dans quelques instants'
-    });
-  }
-});
-
 // Gestion des promesses rejetées non gérées
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Promesse rejetée non gérée:', {
@@ -210,14 +203,11 @@ process.on('unhandledRejection', (reason, promise) => {
     promise: promise
   });
 });
+const PORT = process.env.PORT || 3000;
 
-// Log de démarrage pour Vercel
-logger.info('🚀 Serveur Nizua License configuré pour Vercel', {
-  environment: process.env.NODE_ENV || 'development',
-  nodeVersion: process.version,
-  platform: process.platform,
-  deployment: 'Vercel Serverless'
-});
-
-// Export pour Vercel
-module.exports = app;
+// Si le fichier est exécuté directement (Render / local), on lance le serveur
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Serveur Nizua License démarré sur le port ${PORT}`);
+  });
+}
