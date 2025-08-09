@@ -124,15 +124,15 @@ function toggleAutoRefresh() {
         autoRefreshInterval = null;
         isAutoRefreshActive = false;
         
-        buttonText.textContent = '▶️ Activer l\'actualisation auto';
+        buttonText.textContent = 'Activer l\'actualisation auto';
         button.classList.remove('active');
         
         console.log('Actualisation automatique désactivée');
     } else {
-        autoRefreshInterval = setInterval(checkStatus, 30000);
+        autoRefreshInterval = setInterval(checkStatus, 3000);
         isAutoRefreshActive = true;
         
-        buttonText.textContent = '⏸️ Désactiver l\'actualisation auto';
+        buttonText.textContent = 'Désactiver l\'actualisation auto';
         button.classList.add('active');
         
         console.log('Actualisation automatique activée (30s)');
