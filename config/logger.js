@@ -65,11 +65,11 @@ const logger = winston.createLogger({
 });
 
 // Ajouter la console en développement
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat
-  }));
-}
+// Toujours ajouter la console pour que Render puisse capturer les logs
+logger.add(new winston.transports.Console({
+  format: consoleFormat,
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+}));
 
 // Méthodes utilitaires pour les logs de sécurité
 logger.security = (message, meta = {}) => {
