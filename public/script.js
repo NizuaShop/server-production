@@ -170,6 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Vérifier le statut immédiatement
     checkStatus();
+
+    document.getElementById('checkStatusBtn').addEventListener('click', checkStatus);
+    document.getElementById('autoRefreshBtn').addEventListener('click', toggleAutoRefresh);
     
     // Ajouter des gestionnaires d'événements pour les raccourcis clavier
     document.addEventListener('keydown', (event) => {
