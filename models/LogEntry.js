@@ -106,7 +106,7 @@ logEntrySchema.index({ module: 1, created_at: -1 });
 logEntrySchema.statics.cleanOldLogs = function(daysToKeep = 30) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-  
+
   return this.deleteMany({
     created_at: { $lt: cutoffDate }
   });
@@ -116,7 +116,7 @@ logEntrySchema.statics.cleanOldLogs = function(daysToKeep = 30) {
 logEntrySchema.statics.getLogStats = function(hwid, hours = 24) {
   const cutoffDate = new Date();
   cutoffDate.setHours(cutoffDate.getHours() - hours);
-  
+
   return this.aggregate([
     {
       $match: {
