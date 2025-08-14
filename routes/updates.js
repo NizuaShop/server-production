@@ -167,11 +167,25 @@ router.get('/download', async (req, res) => {
     const release = await fetchReleaseByTag(tokenDoc.token, repoOwner, repoName, version);
     
     if (!release || !release.assets || release.assets.length === 0) {
+      logger.warn(`Release ou assets non trouvés pour la version ${version}`);
+      if (release) {
+        logger.info(`Release trouvée mais assets manquants:`, {
+          version,
+          assetsCount: release.assets ? release.assets.length : 0
+        });
+      }
       return res.status(404).json({
         success: false,
         error: 'Fichier de mise à jour non trouvé'
       });
     }
+    
+    // Log des assets trouvés pour vérification
+    logger.info(`Assets trouvés pour la version ${version}:`, release.assets.map(a => ({
+      name: a.name,
+      size: a.size,
+      download_url: a.browser_download_url
+    })));
     
     // Trouver l'asset principal (exe ou zip)
     const asset = release.assets.find(asset => 
@@ -182,6 +196,9 @@ router.get('/download', async (req, res) => {
     );
     
     if (!asset) {
+      logger.warn(`Aucun asset compatible trouvé pour la version ${version}`, {
+        availableAssets: release.assets.map(a => a.name)
+      });
       return res.status(404).json({
         success: false,
         error: 'Fichier d\'installation non trouvé'
@@ -193,6 +210,7 @@ router.get('/download', async (req, res) => {
       version,
       asset: asset.name,
       size: asset.size,
+      downloadUrl: asset.browser_download_url,
       user: req.user.hwid.substring(0, 8) + '...'
     });
     
@@ -209,7 +227,15 @@ router.get('/download', async (req, res) => {
       }
     };
     
+    logger.info('Proxy request options:', {
+      hostname: options.hostname,
+      path: options.path,
+      hasToken: !!tokenDoc.token
+    });
+    
     const proxyReq = https.request(options, (proxyRes) => {
+      logger.info(`Proxy response status: ${proxyRes.statusCode}`);
+      
       // Copier les headers de réponse
       res.set({
         'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
@@ -311,10 +337,16 @@ function fetchReleaseByTag(token, owner, repo, tag) {
       
       res.on('end', () => {
         try {
+          // Ajout de logs détaillés pour le débogage
+          logger.info(`GitHub API Response Status for tag ${tag}: ${res.statusCode}`);
+          logger.info(`GitHub API Response Body for tag ${tag}: ${data}`);
+          
           if (res.statusCode === 200) {
             const release = JSON.parse(data);
             resolve(release);
           } else {
+            // Si le statut n'est pas 200, nous voulons savoir pourquoi
+            logger.error(`GitHub API returned status ${res.statusCode} for tag ${tag}. Response: ${data}`);
             resolve(null);
           }
         } catch (error) {
