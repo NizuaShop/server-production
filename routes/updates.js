@@ -197,18 +197,19 @@ router.get('/download', async (req, res) => {
     
     let downloadUrl;
     let filename;
-    let useZipball = false;
+    let acceptHeader = 'application/octet-stream';
     
     if (!asset) {
       // Si aucun asset spécifique n'est trouvé, utiliser le zipball_url
       if (release.zipball_url) {
-        downloadUrl = release.zipball_url;
+        // Convertir zipball_url en API endpoint pour l'authentification
+        downloadUrl = `/repos/${repoOwner}/${repoName}/zipball/${release.tag_name}`;
         filename = `Nizua_Loader-${release.tag_name}.zip`;
-        useZipball = true;
+        acceptHeader = 'application/zip';
         
-        logger.info('Aucun asset spécifique trouvé, utilisation du zipball', {
+        logger.info('Aucun asset spécifique trouvé, utilisation de l\'API zipball', {
           version,
-          zipball_url: release.zipball_url,
+          api_endpoint: downloadUrl,
           filename
         });
       } else {
@@ -221,17 +222,17 @@ router.get('/download', async (req, res) => {
         });
       }
     } else {
-      downloadUrl = asset.browser_download_url;
+      // Utiliser l'API endpoint pour les assets privés
+      downloadUrl = `/repos/${repoOwner}/${repoName}/releases/assets/${asset.id}`;
       filename = asset.name;
+      acceptHeader = 'application/octet-stream';
       
-      logger.warn(`Aucun asset compatible trouvé pour la version ${version}`, {
-        availableAssets: release.assets.map(a => a.name)
-      });
       logger.info('Asset spécifique trouvé', {
         version,
         asset: asset.name,
         size: asset.size,
-        downloadUrl: asset.browser_download_url
+        api_endpoint: downloadUrl,
+        asset_id: asset.id
       });
     }
     
@@ -239,65 +240,69 @@ router.get('/download', async (req, res) => {
     logger.info('Téléchargement de mise à jour', {
       version,
       filename,
-      downloadUrl,
-      useZipball,
+      api_endpoint: downloadUrl,
       size: asset ? asset.size : 'unknown',
       user: req.user.hwid.substring(0, 8) + '...'
     });
     
-    // Préparer les options de requête selon le type de téléchargement
-    let options;
-    
-    if (useZipball) {
-      // Pour zipball_url, utiliser api.github.com
-      const url = new URL(downloadUrl);
-      options = {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        headers: {
-          'Authorization': `token ${tokenDoc.token}`,
-          'User-Agent': 'Nizua-Loader-Updater',
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      };
-    } else {
-      // Pour les assets normaux, utiliser github.com
-      options = {
-        hostname: 'github.com',
-        path: downloadUrl.replace('https://github.com', ''),
-        headers: {
-          'Authorization': `token ${tokenDoc.token}`,
-          'User-Agent': 'Nizua-Loader-Updater'
-        }
-      };
-    }
+    // Préparer les options de requête pour l'API GitHub
+    const options = {
+      hostname: 'api.github.com',
+      path: downloadUrl,
+      headers: {
+        'Authorization': `token ${tokenDoc.token}`,
+        'User-Agent': 'Nizua-Loader-Updater',
+        'Accept': acceptHeader
+      }
+    };
     
     logger.info('Proxy request options:', {
       hostname: options.hostname,
       path: options.path,
+      accept: acceptHeader,
       hasToken: !!tokenDoc.token
     });
     
     const proxyReq = https.request(options, (proxyRes) => {
       logger.info(`Proxy response status: ${proxyRes.statusCode}`);
+      logger.info(`Proxy response headers:`, proxyRes.headers);
       
-      // Copier les headers de réponse
-      res.set({
-        'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
-        'Content-Length': proxyRes.headers['content-length'],
-        'Content-Disposition': `attachment; filename="${filename}"`
-      });
-      
-      // Pipe la réponse
-      proxyRes.pipe(res);
+      if (proxyRes.statusCode === 200) {
+        // Copier les headers de réponse pour un téléchargement réussi
+        res.set({
+          'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
+          'Content-Length': proxyRes.headers['content-length'],
+          'Content-Disposition': `attachment; filename="${filename}"`
+        });
+        
+        // Pipe la réponse
+        proxyRes.pipe(res);
+      } else {
+        // Gérer les erreurs de l'API GitHub
+        let errorData = '';
+        proxyRes.on('data', (chunk) => {
+          errorData += chunk;
+        });
+        
+        proxyRes.on('end', () => {
+          logger.error(`GitHub API error ${proxyRes.statusCode}:`, errorData);
+          res.status(proxyRes.statusCode).json({
+            success: false,
+            error: `Erreur GitHub API: ${proxyRes.statusCode}`,
+            details: errorData
+          });
+        });
+      }
     });
     
     proxyReq.on('error', (error) => {
       logger.error('Erreur proxy téléchargement:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Erreur lors du téléchargement'
-      });
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: 'Erreur lors du téléchargement'
+        });
+      }
     });
     
     proxyReq.end();
