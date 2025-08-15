@@ -195,37 +195,82 @@ router.get('/download', async (req, res) => {
       asset.name.includes('installer')
     );
     
+    let downloadUrl;
+    let filename;
+    let useZipball = false;
+    
     if (!asset) {
+      // Si aucun asset spécifique n'est trouvé, utiliser le zipball_url
+      if (release.zipball_url) {
+        downloadUrl = release.zipball_url;
+        filename = `Nizua_Loader-${release.tag_name}.zip`;
+        useZipball = true;
+        
+        logger.info('Aucun asset spécifique trouvé, utilisation du zipball', {
+          version,
+          zipball_url: release.zipball_url,
+          filename
+        });
+      } else {
+        logger.warn(`Aucun asset compatible ni zipball trouvé pour la version ${version}`, {
+          availableAssets: release.assets.map(a => a.name)
+        });
+        return res.status(404).json({
+          success: false,
+          error: 'Fichier d\'installation non trouvé'
+        });
+      }
+    } else {
+      downloadUrl = asset.browser_download_url;
+      filename = asset.name;
+      
       logger.warn(`Aucun asset compatible trouvé pour la version ${version}`, {
         availableAssets: release.assets.map(a => a.name)
       });
-      return res.status(404).json({
-        success: false,
-        error: 'Fichier d\'installation non trouvé'
+      logger.info('Asset spécifique trouvé', {
+        version,
+        asset: asset.name,
+        size: asset.size,
+        downloadUrl: asset.browser_download_url
       });
     }
     
     // Proxy le téléchargement
     logger.info('Téléchargement de mise à jour', {
       version,
-      asset: asset.name,
-      size: asset.size,
-      downloadUrl: asset.browser_download_url,
+      filename,
+      downloadUrl,
+      useZipball,
+      size: asset ? asset.size : 'unknown',
       user: req.user.hwid.substring(0, 8) + '...'
     });
     
-    // Rediriger vers l'URL de téléchargement GitHub avec authentification
-    const downloadUrl = asset.browser_download_url;
+    // Préparer les options de requête selon le type de téléchargement
+    let options;
     
-    // Faire une requête proxy pour cacher l'URL GitHub
-    const options = {
-      hostname: 'github.com',
-      path: downloadUrl.replace('https://github.com', ''),
-      headers: {
-        'Authorization': `token ${tokenDoc.token}`,
-        'User-Agent': 'Nizua-Loader-Updater'
-      }
-    };
+    if (useZipball) {
+      // Pour zipball_url, utiliser api.github.com
+      const url = new URL(downloadUrl);
+      options = {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        headers: {
+          'Authorization': `token ${tokenDoc.token}`,
+          'User-Agent': 'Nizua-Loader-Updater',
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      };
+    } else {
+      // Pour les assets normaux, utiliser github.com
+      options = {
+        hostname: 'github.com',
+        path: downloadUrl.replace('https://github.com', ''),
+        headers: {
+          'Authorization': `token ${tokenDoc.token}`,
+          'User-Agent': 'Nizua-Loader-Updater'
+        }
+      };
+    }
     
     logger.info('Proxy request options:', {
       hostname: options.hostname,
@@ -240,7 +285,7 @@ router.get('/download', async (req, res) => {
       res.set({
         'Content-Type': proxyRes.headers['content-type'] || 'application/octet-stream',
         'Content-Length': proxyRes.headers['content-length'],
-        'Content-Disposition': `attachment; filename="${asset.name}"`
+        'Content-Disposition': `attachment; filename="${filename}"`
       });
       
       // Pipe la réponse
