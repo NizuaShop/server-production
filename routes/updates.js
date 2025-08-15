@@ -277,8 +277,72 @@ router.get('/download', async (req, res) => {
         
         // Pipe la réponse
         proxyRes.pipe(res);
+      } else if (proxyRes.statusCode === 302) {
+        // GitHub redirige vers une URL (souvent objects.githubusercontent.com). Suivre la Location
+        const location = proxyRes.headers.location || proxyRes.headers.Location;
+        logger.info('GitHub returned 302, following Location:', { location });
+        
+        if (!location) {
+          logger.error('Location header manquante sur 302');
+          return res.status(502).json({
+            success: false,
+            error: 'Redirection sans Location'
+          });
+        }
+        
+        // Faire une requête GET simple vers la Location sans Authorization
+        const followReq = https.get(location, (finalRes) => {
+          logger.info(`Followed redirect status: ${finalRes.statusCode}`);
+          // Si finalRes est 200, on pipe directement. Pour d'autres statuts, on renvoie une erreur appropriée.
+          if (finalRes.statusCode === 200) {
+            res.set({
+              'Content-Type': finalRes.headers['content-type'] || 'application/octet-stream',
+              'Content-Length': finalRes.headers['content-length'],
+              'Content-Disposition': `attachment; filename="${filename}"`
+            });
+            finalRes.pipe(res);
+          } else {
+            let errorData = '';
+            finalRes.on('data', (chunk) => {
+              errorData += chunk;
+            });
+            finalRes.on('end', () => {
+              logger.error(`Erreur lors du follow redirect: ${finalRes.statusCode}`, errorData);
+              if (!res.headersSent) {
+                res.status(finalRes.statusCode).json({
+                  success: false,
+                  error: `Erreur lors du téléchargement (redirect): ${finalRes.statusCode}`,
+                  details: errorData
+                });
+              }
+            });
+          }
+        });
+        
+        followReq.on('error', (err) => {
+          logger.error('Erreur lors de la requête follow (https.get):', err);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: 'Erreur lors du téléchargement (follow redirect)'
+            });
+          }
+        });
+        
+        // Optionnel: timeout pour la requête follow
+        followReq.setTimeout(20000, () => {
+          logger.error('Timeout lors de la requête follow (https.get)');
+          followReq.destroy();
+          if (!res.headersSent) {
+            res.status(504).json({
+              success: false,
+              error: 'Timeout lors du téléchargement (follow redirect)'
+            });
+          }
+        });
+        
       } else {
-        // Gérer les erreurs de l'API GitHub
+        // Gérer les erreurs de l'API GitHub (tous les autres statuts sauf 200 et 302)
         let errorData = '';
         proxyRes.on('data', (chunk) => {
           errorData += chunk;
