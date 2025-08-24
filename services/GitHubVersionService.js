@@ -126,8 +126,8 @@ class GitHubVersionService {
       if (versionChanged) {
         await currentVersion.save();
         
-        // Créer une release GitHub automatiquement
-        await this.createGitHubRelease(currentVersion);
+        // Récupérer les informations de la dernière release (créée par GitHub Action)
+        await this.updateReleaseAssetInfo(currentVersion, tokenDoc.token);
       }
       
     } catch (error) {
@@ -277,6 +277,95 @@ class GitHubVersionService {
       });
 
       req.write(postData);
+      req.end();
+    });
+  }
+
+  async updateReleaseAssetInfo(versionDoc, token) {
+    try {
+      // Récupérer les détails de la release avec le tag "latest"
+      const latestRelease = await this._fetchLatestReleaseDetails(token);
+      
+      if (!latestRelease) {
+        logger.warn('Aucune release "latest" trouvée');
+        return;
+      }
+
+      // Extraire le SHA256 du corps de la release
+      const sha256Match = latestRelease.body.match(/SHA256:\s*([a-fA-F0-9]{64})/);
+      if (sha256Match) {
+        versionDoc.latestReleaseAssetSha256 = sha256Match[1];
+        logger.info('SHA256 extrait de la release:', sha256Match[1]);
+      } else {
+        logger.warn('SHA256 non trouvé dans le corps de la release');
+      }
+
+      // Trouver l'asset Nizua-Loader.zip et récupérer sa taille
+      const zipAsset = latestRelease.assets.find(asset => 
+        asset.name === 'Nizua-Loader.zip'
+      );
+      
+      if (zipAsset) {
+        versionDoc.latestReleaseAssetSize = zipAsset.size;
+        logger.info('Taille de l\'asset ZIP:', zipAsset.size, 'bytes');
+      } else {
+        logger.warn('Asset Nizua-Loader.zip non trouvé dans la release');
+      }
+
+      // Sauvegarder les informations mises à jour
+      await versionDoc.save();
+      
+      logger.info('Informations de release mises à jour', {
+        version: versionDoc.version,
+        sha256: versionDoc.latestReleaseAssetSha256,
+        size: versionDoc.latestReleaseAssetSize
+      });
+
+    } catch (error) {
+      logger.error('❌ Erreur mise à jour informations release:', error);
+    }
+  }
+
+  async _fetchLatestReleaseDetails(token) {
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.github.com',
+        path: `/repos/${this.repoOwner}/${this.repoName}/releases/tags/latest`,
+        headers: {
+          'Authorization': `token ${token}`,
+          'User-Agent': 'Nizua-Version-Service',
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            if (res.statusCode === 200) {
+              const release = JSON.parse(data);
+              resolve(release);
+            } else {
+              logger.warn(`Release "latest" non trouvée: ${res.statusCode}`);
+              resolve(null);
+            }
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.setTimeout(10000, () => {
+        req.destroy();
+        reject(new Error('Timeout GitHub API'));
+      });
+
       req.end();
     });
   }

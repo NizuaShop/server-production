@@ -33,6 +33,17 @@ const appVersionSchema = new mongoose.Schema({
     url: String
   },
   
+  // Informations de l'asset de la dernière release
+  latestReleaseAssetSha256: {
+    type: String,
+    default: null
+  },
+  
+  latestReleaseAssetSize: {
+    type: Number,
+    default: 0
+  },
+  
   // Historique des versions
   versionHistory: [{
     version: String,

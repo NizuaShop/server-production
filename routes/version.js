@@ -23,7 +23,9 @@ router.get('/current', async (req, res) => {
       version: versionDoc.version,
       buildNumber: versionDoc.buildNumber,
       lastCommit: versionDoc.lastCommit,
-      updatedAt: versionDoc.updatedAt
+      updatedAt: versionDoc.updatedAt,
+      sha256: versionDoc.latestReleaseAssetSha256,
+      size: versionDoc.latestReleaseAssetSize
     });
 
   } catch (error) {
