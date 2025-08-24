@@ -77,7 +77,7 @@ class GitHubVersionService {
       }
 
       if (newCommits.length > 0) {
-        await this.processNewCommits(currentVersion, newCommits.reverse());
+        await this.processNewCommits(currentVersion, newCommits.reverse(), tokenDoc);
       }
 
     } catch (error) {
@@ -85,7 +85,7 @@ class GitHubVersionService {
     }
   }
 
-  async processNewCommits(currentVersion, newCommits) {
+  async processNewCommits(currentVersion, newCommits, tokenDoc) {
     try {
       let versionChanged = false;
       
