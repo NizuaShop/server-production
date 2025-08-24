@@ -82,8 +82,20 @@ class GitHubVersionService {
       const oldVersion = currentVersion.version;
       const newVersion = release.tag_name;
       
+      // Extract version from release body first, fallback to tag_name
+      let versionToUse = newVersion;
+      if (release.body) {
+        const versionMatch = release.body.match(/Version:\s*([0-9]+\.[0-9]+\.[0-9]+)/i);
+        if (versionMatch) {
+          versionToUse = versionMatch[1];
+          logger.info('Version extraite du body de la release:', versionToUse);
+        } else {
+          logger.info('Version non trouvée dans le body, utilisation du tag:', newVersion);
+        }
+      }
+      
       // Mettre à jour la version
-      currentVersion.version = newVersion;
+      currentVersion.version = versionToUse;
       currentVersion.buildNumber += 1;
       currentVersion.updatedAt = new Date();
       
@@ -94,7 +106,7 @@ class GitHubVersionService {
       // Mettre à jour les informations du commit
       currentVersion.lastCommitSha = commitSha;
       currentVersion.lastCommit = {
-        message: release.name || `Release ${newVersion}`,
+        message: release.name || `Release ${versionToUse}`,
         author: release.author ? release.author.login : 'GitHub',
         date: new Date(release.published_at),
         url: release.html_url
@@ -103,12 +115,12 @@ class GitHubVersionService {
       // Ajouter à l'historique
       currentVersion.addToHistory({
         sha: commitSha,
-        message: release.body || `Release ${newVersion}`
+        message: release.body || `Release ${versionToUse}`
       });
       
       logger.info('🆕 Nouvelle version depuis release GitHub', {
         oldVersion,
-        newVersion,
+        newVersion: versionToUse,
         releaseDate: release.published_at,
         releaseUrl: release.html_url
       });
