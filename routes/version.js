@@ -180,24 +180,24 @@ router.post('/config', requireAdminAuth, async (req, res) => {
   }
 });
 
-// Route admin: Forcer la vérification des commits
-router.post('/check-commits', requireAdminAuth, async (req, res) => {
+// Route admin: Forcer la vérification des releases
+router.post('/check-release', requireAdminAuth, async (req, res) => {
   try {
     const GitHubVersionService = require('../services/GitHubVersionService');
     const versionService = new GitHubVersionService();
     
-    await versionService.checkForNewCommits();
+    await versionService.checkForNewRelease();
     
     res.json({
       success: true,
-      message: 'Vérification des commits lancée'
+      message: 'Vérification des releases lancée'
     });
 
   } catch (error) {
-    logger.error('Erreur vérification commits:', error);
+    logger.error('Erreur vérification releases:', error);
     res.status(500).json({
       success: false,
-      error: 'Erreur lors de la vérification des commits'
+      error: 'Erreur lors de la vérification des releases'
     });
   }
 });

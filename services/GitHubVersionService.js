@@ -26,17 +26,17 @@ class GitHubVersionService {
 
   startPeriodicCheck() {
     // Vérifier immédiatement
-    this.checkForNewCommits();
+    this.checkForNewRelease();
     
     // Puis toutes les 5 minutes
     this.checkInterval = setInterval(() => {
-      this.checkForNewCommits();
+      this.checkForNewRelease();
     }, 5 * 60 * 1000);
     
-    logger.info('🔄 Vérification périodique des commits démarrée (5 min)');
+    logger.info('🔄 Vérification périodique des releases démarrée (5 min)');
   }
 
-  async checkForNewCommits() {
+  async checkForNewRelease() {
     try {
       if (!this.repoOwner || !this.repoName) {
         return;
@@ -52,86 +52,75 @@ class GitHubVersionService {
         return;
       }
 
-      // Récupérer les commits récents
-      const commits = await this.fetchRecentCommits(tokenDoc.token);
+      // Récupérer la dernière release
+      const latestRelease = await this._fetchLatestReleaseDetails(tokenDoc.token);
       
-      if (!commits || commits.length === 0) {
+      if (!latestRelease) {
         return;
       }
 
-      // Vérifier s'il y a de nouveaux commits
-      const latestCommit = commits[0];
+      // Vérifier si c'est une nouvelle version
+      const releaseVersion = latestRelease.tag_name;
+      const releaseDate = new Date(latestRelease.published_at);
       
-      if (currentVersion.lastCommitSha === latestCommit.sha) {
-        // Pas de nouveaux commits
+      if (currentVersion.version === releaseVersion && 
+          currentVersion.updatedAt >= releaseDate) {
+        // Pas de nouvelle release
         return;
       }
 
-      // Traiter les nouveaux commits
-      const newCommits = [];
-      for (const commit of commits) {
-        if (commit.sha === currentVersion.lastCommitSha) {
-          break;
-        }
-        newCommits.push(commit);
-      }
-
-      if (newCommits.length > 0) {
-        await this.processNewCommits(currentVersion, newCommits.reverse(), tokenDoc);
-      }
+      // Traiter la nouvelle release
+      await this.processNewRelease(currentVersion, latestRelease, tokenDoc);
 
     } catch (error) {
-      logger.error('❌ Erreur vérification commits:', error);
+      logger.error('❌ Erreur vérification release:', error);
     }
   }
 
-  async processNewCommits(currentVersion, newCommits, tokenDoc) {
+  async processNewRelease(currentVersion, release, tokenDoc) {
     try {
-      let versionChanged = false;
+      const oldVersion = currentVersion.version;
+      const newVersion = release.tag_name;
       
-      for (const commit of newCommits) {
-        // Déterminer le type de version basé sur le message du commit
-        const versionType = currentVersion.determineVersionType(commit.commit.message);
-        
-        // Incrémenter la version
-        const oldVersion = currentVersion.version;
-        currentVersion.incrementVersion(versionType);
-        
-        // Mettre à jour les informations du commit
-        currentVersion.lastCommitSha = commit.sha;
-        currentVersion.lastCommit = {
-          message: commit.commit.message,
-          author: commit.commit.author.name,
-          date: new Date(commit.commit.author.date),
-          url: commit.html_url
-        };
-        
-        // Ajouter à l'historique
-        currentVersion.addToHistory({
-          sha: commit.sha,
-          message: commit.commit.message
-        });
-        
-        logger.info('🆕 Nouvelle version créée', {
-          oldVersion,
-          newVersion: currentVersion.version,
-          versionType,
-          commitSha: commit.sha.substring(0, 7),
-          commitMessage: commit.commit.message.split('\n')[0]
-        });
-        
-        versionChanged = true;
-      }
+      // Mettre à jour la version
+      currentVersion.version = newVersion;
+      currentVersion.buildNumber += 1;
+      currentVersion.updatedAt = new Date();
       
-      if (versionChanged) {
-        await currentVersion.save();
-        
-        // Récupérer les informations de la dernière release (créée par GitHub Action)
-        await this.updateReleaseAssetInfo(currentVersion, tokenDoc.token);
-      }
+      // Extraire les informations du commit depuis le corps de la release si disponible
+      const commitShaMatch = release.body ? release.body.match(/commit[:\s]+([a-f0-9]{40})/i) : null;
+      const commitSha = commitShaMatch ? commitShaMatch[1] : 'unknown';
+      
+      // Mettre à jour les informations du commit
+      currentVersion.lastCommitSha = commitSha;
+      currentVersion.lastCommit = {
+        message: release.name || `Release ${newVersion}`,
+        author: release.author ? release.author.login : 'GitHub',
+        date: new Date(release.published_at),
+        url: release.html_url
+      };
+      
+      // Ajouter à l'historique
+      currentVersion.addToHistory({
+        sha: commitSha,
+        message: release.body || `Release ${newVersion}`
+      });
+      
+      logger.info('🆕 Nouvelle version depuis release GitHub', {
+        oldVersion,
+        newVersion,
+        releaseDate: release.published_at,
+        releaseUrl: release.html_url
+      });
+      
+      // Sauvegarder les changements
+      await currentVersion.save();
+      
+      // Mettre à jour les informations de l'asset
+      await this.updateReleaseAssetInfo(currentVersion, tokenDoc.token);
       
     } catch (error) {
-      logger.error('❌ Erreur traitement commits:', error);
+      logger.error('❌ Erreur traitement release:', error);
     }
   }
 
