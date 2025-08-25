@@ -164,13 +164,13 @@ router.get('/download', async (req, res) => {
     const repoName = process.env.GITHUB_REPO_NAME;
     
     // Récupérer les détails de la release
-    const release = await fetchReleaseByTag(tokenDoc.token, repoOwner, repoName, version);
+    const release = await fetchLatestRelease(tokenDoc.token, repoOwner, repoName);
     
     if (!release || !release.assets || release.assets.length === 0) {
-      logger.warn(`Release ou assets non trouvés pour la version ${version}`);
+      logger.warn(`Release latest ou assets non trouvés`);
       if (release) {
         logger.info(`Release trouvée mais assets manquants:`, {
-          version,
+          tag_name: release.tag_name,
           assetsCount: release.assets ? release.assets.length : 0
         });
       }
@@ -181,7 +181,7 @@ router.get('/download', async (req, res) => {
     }
     
     // Log des assets trouvés pour vérification
-    logger.info(`Assets trouvés pour la version ${version}:`, release.assets.map(a => ({
+    logger.info(`Assets trouvés pour la release ${release.tag_name}:`, release.assets.map(a => ({
       name: a.name,
       size: a.size,
       download_url: a.browser_download_url
@@ -204,16 +204,17 @@ router.get('/download', async (req, res) => {
       if (release.zipball_url) {
         // Convertir zipball_url en API endpoint pour l'authentification
         downloadUrl = `/repos/${repoOwner}/${repoName}/zipball/${release.tag_name}`;
-        filename = `Nizua_Loader-${release.tag_name}.zip`;
+        filename = `Nizua_Loader-${version}.zip`;
         acceptHeader = 'application/zip';
         
         logger.info('Aucun asset spécifique trouvé, utilisation de l\'API zipball', {
-          version,
+          requested_version: version,
+          release_tag: release.tag_name,
           api_endpoint: downloadUrl,
           filename
         });
       } else {
-        logger.warn(`Aucun asset compatible ni zipball trouvé pour la version ${version}`, {
+        logger.warn(`Aucun asset compatible ni zipball trouvé pour la release ${release.tag_name}`, {
           availableAssets: release.assets.map(a => a.name)
         });
         return res.status(404).json({
@@ -228,7 +229,8 @@ router.get('/download', async (req, res) => {
       acceptHeader = 'application/octet-stream';
       
       logger.info('Asset spécifique trouvé', {
-        version,
+        requested_version: version,
+        release_tag: release.tag_name,
         asset: asset.name,
         size: asset.size,
         api_endpoint: downloadUrl,
@@ -238,7 +240,8 @@ router.get('/download', async (req, res) => {
     
     // Proxy le téléchargement
     logger.info('Téléchargement de mise à jour', {
-      version,
+      requested_version: version,
+      release_tag: release.tag_name,
       filename,
       api_endpoint: downloadUrl,
       size: asset ? asset.size : 'unknown',
