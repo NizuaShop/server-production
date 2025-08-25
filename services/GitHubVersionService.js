@@ -331,7 +331,7 @@ class GitHubVersionService {
     return new Promise((resolve, reject) => {
       const options = {
         hostname: 'api.github.com',
-        path: `/repos/${this.repoOwner}/${this.repoName}/releases/tags/latest`,
+        path: `/repos/${this.repoOwner}/${this.repoName}/releases/latest`,
         headers: {
           'Authorization': `token ${token}`,
           'User-Agent': 'Nizua-Version-Service',
