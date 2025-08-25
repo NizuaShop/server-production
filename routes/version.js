@@ -134,6 +134,69 @@ router.post('/set', requireAdminAuth, async (req, res) => {
   }
 });
 
+// Route admin: Réinitialiser la version depuis "latest" vers une version sémantique
+router.post('/reset-from-latest', requireAdminAuth, async (req, res) => {
+  try {
+    const { version } = req.body;
+    
+    // Si aucune version n'est fournie, utiliser v0.0.0 par défaut
+    const newVersion = version || 'v0.0.0';
+    
+    // Valider le format de version (vX.X.X)
+    if (!/^v\d+\.\d+\.\d+$/.test(newVersion)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Format de version invalide (attendu: vX.X.X)'
+      });
+    }
+
+    let versionDoc = await AppVersion.getCurrentVersion();
+    
+    if (!versionDoc) {
+      versionDoc = new AppVersion({
+        _id: 'current_version'
+      });
+    }
+
+    const oldVersion = versionDoc.version;
+    
+    // Forcer la mise à jour même si c'est "latest"
+    versionDoc.version = newVersion;
+    versionDoc.buildNumber = versionDoc.buildNumber || 1;
+    versionDoc.updatedAt = new Date();
+    
+    // Ajouter à l'historique
+    versionDoc.addToHistory({
+      sha: 'reset-' + Date.now(),
+      message: `Version réinitialisée depuis "${oldVersion}" vers ${newVersion} pour corriger le problème "latest"`
+    });
+
+    await versionDoc.save();
+
+    logger.info('Version réinitialisée depuis "latest"', {
+      oldVersion,
+      newVersion,
+      admin_ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      message: 'Version réinitialisée avec succès',
+      oldVersion,
+      newVersion,
+      buildNumber: versionDoc.buildNumber,
+      note: 'La version a été réinitialisée pour permettre le bon fonctionnement du système de mise à jour automatique'
+    });
+
+  } catch (error) {
+    logger.error('Erreur réinitialisation version:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la réinitialisation de la version'
+    });
+  }
+});
+
 // Route admin: Configurer le versioning automatique
 router.post('/config', requireAdminAuth, async (req, res) => {
   try {

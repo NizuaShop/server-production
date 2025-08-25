@@ -80,18 +80,45 @@ class GitHubVersionService {
   async processNewRelease(currentVersion, release, tokenDoc) {
     try {
       const oldVersion = currentVersion.version;
-      const newVersion = release.tag_name;
+      const newTag = release.tag_name; // Peut être "latest" ou "v1.2.3"
+      let versionToUse = newTag; // Par défaut, utilise le tag_name
       
-      // Extract version from release body first, fallback to tag_name
-      let versionToUse = newVersion;
+      // Tente toujours d'extraire la version sémantique du corps de la release en premier
       if (release.body) {
-        const versionMatch = release.body.match(/Version:\s*([0-9]+\.[0-9]+\.[0-9]+)/i);
-        if (versionMatch) {
-          versionToUse = versionMatch[1];
+        // Regex pour capturer vX.Y.Z ou X.Y.Z
+        const versionMatch = release.body.match(/Version:\s*(v?\d+\.\d+\.\d+)/i);
+        if (versionMatch && versionMatch[1]) {
+          // Assure le préfixe 'v' pour la cohérence
+          versionToUse = versionMatch[1].startsWith('v') ? versionMatch[1] : `v${versionMatch[1]}`;
           logger.info('Version extraite du body de la release:', versionToUse);
         } else {
-          logger.info('Version non trouvée dans le body, utilisation du tag:', newVersion);
+          logger.info('Version sémantique non trouvée dans le body de la release.');
+          // Si le tag est "latest" et qu'aucune version sémantique n'est dans le corps, c'est un problème.
+          // Nous ne devrions pas utiliser "latest" comme version pour la comparaison.
+          if (newTag.toLowerCase() === 'latest') {
+            logger.warn('Le tag de release est "latest" et aucune version sémantique trouvée dans le corps. La version ne sera pas mise à jour avec "latest".');
+            // Si nous ne pouvons pas déterminer une version sémantique, nous ne devrions pas mettre à jour le champ de version.
+            // Cela empêche de perpétuer la version "latest" dans la base de données.
+            // Le système restera sur sa version sémantique actuelle jusqu'à ce qu'une version appropriée soit trouvée.
+            return; // Quitte la fonction, ne met pas à jour currentVersion.version
+          }
         }
+      } else if (newTag.toLowerCase() === 'latest') {
+        logger.warn('Le tag de release est "latest" et le corps de la release est vide. Impossible de déterminer la version sémantique. La version ne sera pas mise à jour.');
+        return; // Quitte la fonction
+      }
+
+      // Si le tag lui-même est une version sémantique, utilise-le si aucune version n'a été trouvée dans le corps.
+      // Cela gère les cas où le corps pourrait être vide ou ne pas contenir la ligne "Version:",
+      // mais le tag lui-même est une version sémantique appropriée (par exemple, "v1.0.0").
+      if (!/^v?\d+\.\d+\.\d+$/.test(versionToUse) && /^v?\d+\.\d+\.\d+$/.test(newTag)) {
+          versionToUse = newTag.startsWith('v') ? newTag : `v${newTag}`;
+          logger.info('Utilisation du tag de release comme version sémantique:', versionToUse);
+      } else if (!/^v?\d+\.\d+\.\d+$/.test(versionToUse)) {
+          // Si après toutes les tentatives, versionToUse n'est toujours pas sémantique (par exemple, "latest"),
+          // et que le tag lui-même n'est pas sémantique, alors nous ne pouvons pas continuer.
+          logger.error(`Impossible de déterminer une version sémantique valide. La version actuelle (${currentVersion.version}) sera conservée.`);
+          return; // Ne met pas à jour la version
       }
       
       // Mettre à jour la version
