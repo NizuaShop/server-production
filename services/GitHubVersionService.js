@@ -28,10 +28,10 @@ class GitHubVersionService {
     // Vérifier immédiatement
     this.checkForNewRelease();
     
-    // Puis toutes les 5 minutes
+    // Puis toutes les 1h
     this.checkInterval = setInterval(() => {
       this.checkForNewRelease();
-    }, 5 * 60 * 1000);
+    }, 60 * 60 * 1000);
     
     logger.info('🔄 Vérification périodique des releases démarrée (5 min)');
   }
